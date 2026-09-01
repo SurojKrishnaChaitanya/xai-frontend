@@ -57,8 +57,8 @@ export const predictSevereWeather = async (payload = {}) => {
       Math.max(5, Math.round((moistureScore + instabilityScore + kinematicsScore) * 0.55 * terrainFactor))
     );
 
-    const hourlyTrend = [2, 3, 4, 5, 6].map((hour) => {
-      const curve = [1, 1.1, 1.15, 1.0, 0.85][hour - 2];
+    const hourlyTrend = [1,2, 3, 4, 5, 6].map((hour) => {
+      const curve = [0.9, 1, 1.1, 1.15, 1.0, 0.85][hour - 1];
       return { hour, risk: Math.min(99, Math.max(5, Math.round(rawRisk * curve))) };
     });
 

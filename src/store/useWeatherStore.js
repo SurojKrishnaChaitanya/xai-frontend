@@ -127,7 +127,7 @@ export const useWeatherStore = create((set, get) => ({
     set({ selectedRegion: formatRegionObject(regionIdOrObj) }),
 
   // ---- Live Map forecast lead-time scrubber (+2h to +6h, per problem statement) ----
-  forecastHorizon: { min: 2, max: 6, value: 2 },
+  forecastHorizon: { min: 1, max: 6, value: 1 },
 
   setForecastHorizonValue: (value) =>
     set((state) => ({

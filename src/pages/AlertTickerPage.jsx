@@ -1,10 +1,11 @@
 // import React, { useEffect, useMemo, useState } from 'react';
 // import { Search, Radio } from 'lucide-react';
+// import { useQuery } from '@tanstack/react-query';
 
-// import { mockAlerts } from '../mock/mockAlerts';
 // import AlertCard from '../components/alerts/AlertCard';
 // import AlertDetails from '../components/alerts/AlertDetails';
 // import { useWeatherStore } from '../store/useWeatherStore';
+// import { fetchAlerts, USE_REAL_ALERTS } from '../services/alertingService';
 
 // export default function AlertTickerPage() {
 //   const [selectedAlert, setSelectedAlert] = useState(null);
@@ -12,6 +13,22 @@
 //   const [severityFilter, setSeverityFilter] = useState('all');
 //   const [statusFilter, setStatusFilter] = useState('all');
 //   const [search, setSearch] = useState('');
+
+//   // Live alert data — polls the Flask alerting API every 5s when
+//   // VITE_USE_REAL_ALERTS=true (see alertingService.js). Falls back to
+//   // mockAlerts automatically if the flag is off or the API is unreachable,
+//   // so this page always renders something even mid-setup.
+//   const {
+//     data: alerts = [],
+//     isLoading,
+//     isFetching,
+//     dataUpdatedAt,
+//   } = useQuery({
+//     queryKey: ['alerts'],
+//     queryFn: fetchAlerts,
+//     refetchInterval: 5000,
+//     refetchIntervalInBackground: true,
+//   });
 
 //   // Soft default: when the globally selected region changes (e.g. via a
 //   // click on Live Map), seed the search box with its name so this page
@@ -27,7 +44,7 @@
 //   const filteredAlerts = useMemo(() => {
 //     const query = search.trim().toLowerCase();
 
-//     return mockAlerts.filter((alert) => {
+//     return alerts.filter((alert) => {
 //       const matchesHazard =
 //         hazardFilter === 'all' || alert.hazardType === hazardFilter;
 
@@ -50,25 +67,25 @@
 //         matchesSearch
 //       );
 //     });
-//   }, [hazardFilter, severityFilter, statusFilter, search]);
+//   }, [alerts, hazardFilter, severityFilter, statusFilter, search]);
 
-//   const totalAlerts = mockAlerts.length;
+//   const totalAlerts = alerts.length;
 
-//   const activeAlerts = mockAlerts.filter(
+//   const activeAlerts = alerts.filter(
 //     (alert) => alert.status === 'active'
 //   ).length;
 
-//   const severeAlerts = mockAlerts.filter(
+//   const severeAlerts = alerts.filter(
 //     (alert) => alert.severity === 'severe'
 //   ).length;
 
 //   const averageRisk =
-//     mockAlerts.length > 0
+//     alerts.length > 0
 //       ? Math.round(
-//           mockAlerts.reduce(
+//           alerts.reduce(
 //             (sum, alert) => sum + alert.riskScore,
 //             0
-//           ) / mockAlerts.length
+//           ) / alerts.length
 //         )
 //       : 0;
 
@@ -197,14 +214,23 @@
 //         <div className="flex items-center justify-between">
 //           <h3 className="text-lg font-semibold text-slate-900">Current Alerts</h3>
 //           <div className="flex items-center gap-2 text-sm text-slate-500">
-//             <Radio size={15} className="animate-pulse text-emerald-600" />
-//             Live monitoring
+//             <Radio
+//               size={15}
+//               className={`${isFetching ? 'animate-pulse' : ''} ${USE_REAL_ALERTS ? 'text-emerald-600' : 'text-slate-400'}`}
+//             />
+//             {USE_REAL_ALERTS
+//               ? `Live monitoring${dataUpdatedAt ? ` · updated ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}`
+//               : 'Mock data (set VITE_USE_REAL_ALERTS=true for live API)'}
 //           </div>
 //         </div>
 
 //         {/* Alerts List Grid */}
 //         <div className="grid gap-4">
-//           {filteredAlerts.length > 0 ? (
+//           {isLoading ? (
+//             <div className="rounded-lg border border-slate-200/80 bg-white/90 p-10 text-center backdrop-blur-sm">
+//               <p className="text-sm text-slate-500">Loading alerts…</p>
+//             </div>
+//           ) : filteredAlerts.length > 0 ? (
 //             filteredAlerts.map((alert) => (
 //               <AlertCard
 //                 key={alert.id}
@@ -232,8 +258,9 @@
 //   );
 // }
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Radio } from 'lucide-react';
+
+import React, { useMemo, useState } from 'react';
+import { Search, Radio, MapPin, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import AlertCard from '../components/alerts/AlertCard';
@@ -248,33 +275,31 @@ export default function AlertTickerPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
 
+  // City-scoped vs. national view — driven by the same selectedRegion used
+  // on Live Map. Selecting a city there (or clicking a marker) narrows
+  // this page to just that region's alerts; clicking "View all regions"
+  // below (or Live Map's "Reset Overview") clears it back to everything.
+  const selectedRegion = useWeatherStore((state) => state.selectedRegion);
+  const setSelectedRegion = useWeatherStore((state) => state.setSelectedRegion);
+
   // Live alert data — polls the Flask alerting API every 5s when
-  // VITE_USE_REAL_ALERTS=true (see alertingService.js). Falls back to
-  // mockAlerts automatically if the flag is off or the API is unreachable,
-  // so this page always renders something even mid-setup.
+  // VITE_USE_REAL_ALERTS=true (see alertingService.js), scoped to
+  // selectedRegion when one is set. Falls back to mockAlerts automatically
+  // if the flag is off or the API is unreachable.
   const {
     data: alerts = [],
     isLoading,
     isFetching,
     dataUpdatedAt,
   } = useQuery({
-    queryKey: ['alerts'],
-    queryFn: fetchAlerts,
+    queryKey: ['alerts', selectedRegion?.id ?? 'all'],
+    queryFn: () => fetchAlerts(selectedRegion?.id),
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
-  // Soft default: when the globally selected region changes (e.g. via a
-  // click on Live Map), seed the search box with its name so this page
-  // opens scoped to that region. The user can still clear it to browse everything.
-  const selectedRegion = useWeatherStore((state) => state.selectedRegion);
-
-  useEffect(() => {
-    if (selectedRegion?.name) {
-      setSearch(selectedRegion.name);
-    }
-  }, [selectedRegion]);
-
+  // Hazard/severity/status/search filters still apply ON TOP of the
+  // region scope above — e.g. "this city's severe flash floods only".
   const filteredAlerts = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -341,11 +366,34 @@ export default function AlertTickerPage() {
 
       {/* Main Content Layer */}
       <div className="relative z-10 space-y-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Alert Ticker</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Real-time severe weather alerts and response status.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900">Alert Ticker</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Real-time severe weather alerts and response status.
+            </p>
+          </div>
+
+          {/* Scope indicator — shows city vs. national view, with a
+              one-click way back to national from right here. */}
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm shadow-sm backdrop-blur-sm">
+            <MapPin size={15} className="text-sky-600" />
+            {selectedRegion ? (
+              <>
+                <span className="font-medium text-slate-800">
+                  {selectedRegion.name}, {selectedRegion.state}
+                </span>
+                <button
+                  onClick={() => setSelectedRegion(null)}
+                  className="ml-1 flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+                >
+                  <X size={12} /> View all regions
+                </button>
+              </>
+            ) : (
+              <span className="font-medium text-slate-800">All Regions — National View</span>
+            )}
+          </div>
         </div>
 
         {/* KPI Header Grid */}
@@ -356,7 +404,9 @@ export default function AlertTickerPage() {
             </p>
             <div className="mt-2 flex items-end justify-between">
               <p className="text-2xl font-bold text-slate-900">{totalAlerts}</p>
-              <span className="text-xs text-slate-400">All recorded</span>
+              <span className="text-xs text-slate-400">
+                {selectedRegion ? 'This region' : 'All recorded'}
+              </span>
             </div>
           </div>
 
@@ -446,7 +496,9 @@ export default function AlertTickerPage() {
 
         {/* List Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">Current Alerts</h3>
+          <h3 className="text-lg font-semibold text-slate-900">
+            {selectedRegion ? `Alerts for ${selectedRegion.name}` : 'Current Alerts (All Regions)'}
+          </h3>
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Radio
               size={15}
@@ -476,7 +528,9 @@ export default function AlertTickerPage() {
             <div className="rounded-lg border border-slate-200/80 bg-white/90 p-10 text-center backdrop-blur-sm">
               <p className="font-medium text-slate-800">No alerts found</p>
               <p className="mt-1 text-sm text-slate-500">
-                Try changing your filters or search query.
+                {selectedRegion
+                  ? `No alerts currently match your filters for ${selectedRegion.name}.`
+                  : 'Try changing your filters or search query.'}
               </p>
             </div>
           )}
