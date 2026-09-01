@@ -910,7 +910,7 @@ export const RiskAnalysisPage = () => {
           </div>
           <h1 className="text-2xl font-black text-slate-900">{selectedRegion.name} — Severe Weather Nowcast</h1>
           <p className="text-xs text-slate-500">
-            {selectedRegion.state} • +2h to +6h Window • Model Confidence: {((riskData.confidence ?? 0.85) * 100).toFixed(1)}%
+            {selectedRegion.state} • +1h to +6h Window • Model Confidence: {((riskData.confidence ?? 0.85) * 100).toFixed(1)}%
           </p>
         </div>
         <span className={`px-3.5 py-1.5 rounded-xl text-xs font-bold text-white ${theme.badge} shadow-sm uppercase`}>
@@ -977,7 +977,7 @@ export const RiskAnalysisPage = () => {
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-blue-600" />
-              <h2 className="text-sm font-bold text-slate-900">+2h to +6h Nowcast Window</h2>
+              <h2 className="text-sm font-bold text-slate-900">+1h to +6h Nowcast Window</h2>
             </div>
             <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
               Dynamic Risk Trajectory
