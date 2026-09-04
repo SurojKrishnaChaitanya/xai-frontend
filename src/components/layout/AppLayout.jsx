@@ -35,7 +35,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
-      <EmergencyAlertBanner alert={activeAlert} />
+      {/* <EmergencyAlertBanner alert={activeAlert} /> */}
     </div>
   );
 }
