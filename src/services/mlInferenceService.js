@@ -1,3 +1,5 @@
+import { generateAdvisory } from './ragAdvisoryService';
+
 const API_BASE_URL = import.meta.env.VITE_ML_MODEL_API_URL || 'http://localhost:8000';
 const USE_REAL_MODEL = import.meta.env.VITE_USE_REAL_MODEL === 'true';
 
@@ -57,10 +59,15 @@ export const predictSevereWeather = async (payload = {}) => {
       Math.max(5, Math.round((moistureScore + instabilityScore + kinematicsScore) * 0.55 * terrainFactor))
     );
 
-    const hourlyTrend = [1,2, 3, 4, 5, 6].map((hour) => {
-      const curve = [0.9, 1, 1.1, 1.15, 1.0, 0.85][hour - 1];
-      return { hour, risk: Math.min(99, Math.max(5, Math.round(rawRisk * curve))) };
-    });
+    const anchors = { 0: 0.75, 1: 0.9, 2: 1.0, 3: 1.1, 4: 1.15, 5: 1.0, 6: 0.85 };
+    const hourlyTrend = [];
+    for (let h = 0; h <= 6; h += 0.5) {
+      const lower = Math.floor(h);
+      const upper = Math.min(6, Math.ceil(h));
+      const frac = h - lower;
+      const curve = anchors[lower] + (anchors[upper] - anchors[lower]) * frac;
+      hourlyTrend.push({ hour: h, risk: Math.min(99, Math.max(5, Math.round(rawRisk * curve))) });
+    }
 
     const featureImportance = [
       { feature: 'Integrated Water Vapor (IWV)', impact: Math.round(iwv * 0.4) },
@@ -81,6 +88,12 @@ export const predictSevereWeather = async (payload = {}) => {
         return parseFloat(Math.min(1, Math.max(0.05, val)).toFixed(2));
       })
     );
+    const advisory = await generateAdvisory({
+      regionName,
+      hazardType: baseHazard,
+      severity: rawRisk > 75 ? 'severe' : rawRisk > 45 ? 'high' : rawRisk > 20 ? 'moderate' : 'low',
+      riskScore: rawRisk,
+    });
 
     return {
       regionId,
@@ -92,6 +105,7 @@ export const predictSevereWeather = async (payload = {}) => {
       hourlyTrend,
       metrics: {
         precipitationRate: `${precipitation} mm/h`,
+        precipitationDaily: `${Math.round(precipitation * 24)} mm/day (IMD scale)`,
         windSpeed: `${windSpeed} km/h`,
         iwvMoisture: `${iwv} kg/m²`,
         cape: `${cape} J/kg`,
@@ -101,6 +115,7 @@ export const predictSevereWeather = async (payload = {}) => {
       featureImportance,
       attentionGrid,
       xaiExplanation: `${regionName}'s 0–6h nowcast projects peak ${baseHazard} intensity between +2h and +3h, driven primarily by moisture convergence (IWV ${iwv} kg/m²) and instability (CAPE ${cape} J/kg), with terrain slope amplifying downstream flood translation.`,
+      advisory
     };
   }
 
