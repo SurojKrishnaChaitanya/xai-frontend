@@ -2,7 +2,7 @@
   "redirects": [
     {
       "source": "/:path(.*)",
-      "destination": "https://test-repo-s2uccnkqo-surojkrishna-1314s-projects.vercel.app/live-map",
+      "destination": "https://nowcasting-presentation.vercel.app/live-map",
       "permanent": false
     }
   ]
